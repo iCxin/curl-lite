@@ -45,6 +45,43 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
+### 卸载说明
+
+如果您需要卸载 Curl Lite，可以使用以下命令：
+
+```bash
+# 1. 停止并禁用服务
+sudo systemctl stop curl_lite
+sudo systemctl disable curl_lite
+
+# 2. 删除服务文件
+sudo rm /etc/systemd/system/curl_lite.service
+sudo systemctl daemon-reload
+
+# 3. 删除网站文件
+sudo rm -rf /www/wwwroot/curl_lite
+
+# 4. 删除Nginx配置（替换为您的域名）
+sudo rm /www/server/panel/vhost/nginx/your_domain.conf
+sudo nginx -s reload
+
+# 5. 删除日志文件
+sudo rm /www/wwwlogs/curl_lite_*.log
+
+# 6. 删除数据库（请谨慎操作）
+mysql -u root -p -e "DROP DATABASE curl_lite;"
+
+# 7. 清理Redis缓存（可选）
+redis-cli
+> FLUSHDB
+> exit
+
+# 8. 删除安装脚本
+rm -f install.sh
+```
+
+> 注意：执行删除操作前请确保已备份重要数据！
+
 安装过程中需要提供以下信息：
 - 域名（必填）：您的网站域名，如 `short.example.com`
 - MySQL用户名和密码（必填）：用于创建和访问数据库
