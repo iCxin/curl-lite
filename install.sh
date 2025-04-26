@@ -32,8 +32,27 @@ print_step() {
 
 # 检查命令是否存在
 check_command() {
-    if ! command -v $1 &> /dev/null; then
-        print_error "$1 未安装，请先安装 $1"
+    local cmd=$1
+    local custom_path=""
+    
+    case $cmd in
+        "mysql")
+            # 1Panel 中 MySQL 可能的位置
+            if [ -f "/www/server/mysql/bin/mysql" ]; then
+                custom_path="/www/server/mysql/bin/mysql"
+            elif [ -f "/usr/local/mysql/bin/mysql" ]; then
+                custom_path="/usr/local/mysql/bin/mysql"
+            fi
+            ;;
+    esac
+    
+    if [ ! -z "$custom_path" ]; then
+        print_info "找到 $cmd 在: $custom_path"
+        return 0
+    elif command -v $cmd &> /dev/null; then
+        return 0
+    else
+        print_error "$cmd 未安装，请先安装 $cmd"
         exit 1
     fi
 }
@@ -49,7 +68,16 @@ check_python_version() {
 
 # 检查MySQL版本
 check_mysql_version() {
-    local mysql_version=$(mysql --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+    local mysql_cmd="mysql"
+    
+    # 检查 1Panel MySQL 路径
+    if [ -f "/www/server/mysql/bin/mysql" ]; then
+        mysql_cmd="/www/server/mysql/bin/mysql"
+    elif [ -f "/usr/local/mysql/bin/mysql" ]; then
+        mysql_cmd="/usr/local/mysql/bin/mysql"
+    fi
+    
+    local mysql_version=$($mysql_cmd --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
     if ! printf '%s\n%s\n' "$MIN_MYSQL_VERSION" "$mysql_version" | sort -V -C; then
         print_error "MySQL版本过低，需要 $MIN_MYSQL_VERSION 或更高版本"
         exit 1
@@ -298,7 +326,14 @@ EOL
     
     # 创建数据库
     print_step "创建数据库..."
-    if ! mysql -u${MYSQL_USER} -p${MYSQL_PASS} -e "CREATE DATABASE IF NOT EXISTS curl_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
+    local mysql_cmd="mysql"
+    if [ -f "/www/server/mysql/bin/mysql" ]; then
+        mysql_cmd="/www/server/mysql/bin/mysql"
+    elif [ -f "/usr/local/mysql/bin/mysql" ]; then
+        mysql_cmd="/usr/local/mysql/bin/mysql"
+    fi
+    
+    if ! $mysql_cmd -u${MYSQL_USER} -p${MYSQL_PASS} -e "CREATE DATABASE IF NOT EXISTS curl_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
         print_error "创建数据库失败"
         exit 1
     fi
