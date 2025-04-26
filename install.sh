@@ -69,7 +69,7 @@ check_redis_version() {
 check_dependencies() {
     print_step "检查系统依赖..."
     
-    local deps=("python3" "python3-venv" "mysql" "redis-cli" "nginx" "git" "certbot")
+    local deps=("python3" "mysql" "redis-cli" "nginx" "git" "certbot")
     for dep in "${deps[@]}"; do
         check_command $dep
     done
@@ -108,9 +108,19 @@ backup_existing() {
 
 # 主安装流程
 main() {
-    echo "======================================"
-    echo "   Curl Lite 安装脚本 v${VERSION}"
-    echo "======================================"
+    clear
+    echo -e "${BLUE}"
+    echo "  ██████╗██╗   ██╗██████╗ ██╗         ██╗     ██╗████████╗███████╗"
+    echo " ██╔════╝██║   ██║██╔══██╗██║         ██║     ██║╚══██╔══╝██╔════╝"
+    echo " ██║     ██║   ██║██████╔╝██║         ██║     ██║   ██║   █████╗  "
+    echo " ██║     ██║   ██║██╔══██╗██║         ██║     ██║   ██║   ██╔══╝  "
+    echo " ╚██████╗╚██████╔╝██║  ██║███████╗    ███████╗██║   ██║   ███████╗"
+    echo "  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝    ╚══════╝╚═╝   ╚═╝   ╚══════╝"
+    echo -e "${NC}"
+    echo "======================================================================"
+    echo "                          版本 v${VERSION}"
+    echo "======================================================================"
+    echo
     
     # 检查root权限
     if [ "$EUID" -ne 0 ]; then
@@ -168,14 +178,9 @@ main() {
     fi
     cd $INSTALL_DIR
     
-    # 创建虚拟环境
-    print_step "创建Python虚拟环境..."
-    python3 -m venv venv
-    source venv/bin/activate
-    
     # 安装依赖
     print_step "安装Python依赖..."
-    if ! pip install -r requirements.txt; then
+    if ! pip3 install -r requirements.txt; then
         print_error "安装依赖失败"
         exit 1
     fi
@@ -277,8 +282,7 @@ After=network.target mysql.service redis.service
 User=www
 Group=www
 WorkingDirectory=${INSTALL_DIR}
-Environment="PATH=${INSTALL_DIR}/venv/bin"
-ExecStart=${INSTALL_DIR}/venv/bin/gunicorn -c ${INSTALL_DIR}/gunicorn.conf.py app:app
+ExecStart=/usr/bin/python3 -m gunicorn -c ${INSTALL_DIR}/gunicorn.conf.py app:app
 Restart=always
 RestartSec=5
 StartLimitInterval=0
