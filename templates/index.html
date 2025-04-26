@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curl Lite - 短链接生成器</title>
+    <!-- 引入 Flatpickr 日期选择器 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <!-- 引入 QRCode.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #5f6368;
+            font-weight: 500;
+        }
+        input[type="text"], input[type="datetime-local"], input[type="url"], select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        /* 修改日期选择器的样式 */
+        input[type="datetime-local"] {
+            appearance: none;
+            -webkit-appearance: none;
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z' fill='%235F6368'/%3E%3C/svg%3E") no-repeat right 8px center;
+            padding-right: 40px;
+        }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        input[type="text"]:focus, input[type="datetime-local"]:focus, input[type="url"]:focus, select:focus {
+            border-color: #1a73e8;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e8f0fe;
+            border-radius: 8px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash-message {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background-color: #fce8e6;
+            color: #d93025;
+            font-size: 14px;
+        }
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .refresh-btn {
+            background-color: #34a853;
+        }
+        .refresh-btn:hover {
+            background-color: #2d9249;
+        }
+        .short-url {
+            word-break: break-all;
+            font-size: 18px;
+            color: #1a73e8;
+            text-decoration: none;
+        }
+        .short-url:hover {
+            text-decoration: underline;
+        }
+        .expiry-info {
+            margin-top: 10px;
+            color: #5f6368;
+            font-size: 14px;
+        }
+        .input-hint {
+            font-size: 13px;
+            color: #5f6368;
+            margin-top: 6px;
+        }
+        .detailed-hint {
+            font-size: 13px;
+            color: #5f6368;
+            margin-top: 8px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #1a73e8;
+        }
+        .detailed-hint p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+        .detailed-hint p:first-child {
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        input[type="url"]:invalid {
+            border-color: #d93025;
+        }
+        input[type="url"]:invalid:focus {
+            border-color: #d93025;
+            box-shadow: 0 0 0 2px rgba(217, 48, 37, 0.2);
+        }
+        /* 添加日期选择器的自定义样式 */
+        ::-webkit-datetime-edit {
+            padding: 0;
+        }
+        ::-webkit-datetime-edit-fields-wrapper {
+            background: transparent;
+        }
+        ::-webkit-datetime-edit-text {
+            color: #5f6368;
+            padding: 0 2px;
+        }
+        ::-webkit-datetime-edit-month-field,
+        ::-webkit-datetime-edit-day-field,
+        ::-webkit-datetime-edit-year-field,
+        ::-webkit-datetime-edit-hour-field,
+        ::-webkit-datetime-edit-minute-field,
+        ::-webkit-datetime-edit-ampm-field {
+            color: #333;
+        }
+        /* Flatpickr 自定义样式 */
+        .flatpickr-calendar {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .flatpickr-day.selected {
+            background: #1a73e8;
+            border-color: #1a73e8;
+        }
+        .flatpickr-day:hover {
+            background: #e8f0fe;
+        }
+        .flatpickr-current-month {
+            color: #1a73e8;
+        }
+        /* 用户信息样式 */
+        .user-info {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .user-info span {
+            color: #5f6368;
+            font-size: 14px;
+        }
+        .logout-btn {
+            color: #d93025;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .logout-btn:hover {
+            background-color: #fee2e2;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .generate-btn {
+            padding: 12px 16px;
+            background-color: #34a853;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .generate-btn:hover {
+            background-color: #2d9249;
+        }
+        .input-group input[type="text"] {
+            flex: 1;
+        }
+        .manage-btn {
+            color: #1a73e8;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .manage-btn:hover {
+            background-color: #e8f0fe;
+        }
+        .short-url-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .copy-btn, .qr-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .copy-btn {
+            background-color: #1a73e8;
+        }
+        .copy-btn:hover {
+            background-color: #1557b0;
+        }
+        .qr-btn {
+            background-color: #34a853;
+        }
+        .qr-btn:hover {
+            background-color: #2d9249;
+        }
+        .qrcode-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+        }
+        .qrcode-tip {
+            text-align: center;
+            color: #5f6368;
+            margin-bottom: 20px;
+        }
+        .download-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .download-btn:hover {
+            background-color: #1557b0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 100px auto;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #5f6368;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="user-info">
+            <span>欢迎，{{ session.get('user_name', '访客') }}</span>
+            <a href="{{ url_for('manage') }}" class="manage-btn">管理短链接</a>
+            <a href="{{ url_for('logout') }}" class="logout-btn">退出登录</a>
+        </div>
+        <h1>Curl Lite</h1>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                        <div class="flash-message">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('index') }}" id="urlForm">
+            <div class="form-group">
+                <label for="url">输入URL地址：</label>
+                <input type="url" id="url" name="url" required 
+                    class="form-input"
+                    placeholder="请输入完整URL（例如：https://www.example.com）"
+                    pattern="^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?$"
+                    oninvalid="showDetailedUrlHint()"
+                    oninput="hideDetailedUrlHint()">
+                <div class="input-hint" id="simple-hint">必须包含 http:// 或 https://</div>
+                <div class="detailed-hint" id="detailed-hint" style="display: none;">
+                    <p>✓ 正确格式示例：</p>
+                    <p>- https://www.example.com</p>
+                    <p>- http://subdomain.example.com/path</p>
+                    <p>× 错误格式示例：</p>
+                    <p>- www.example.com（缺少https://）</p>
+                    <p>- example.com（缺少https://）</p>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="custom_code">自定义后缀（可选）：</label>
+                <div class="input-group">
+                    <input type="text" id="custom_code" name="custom_code" placeholder="输入自定义后缀">
+                    <button type="button" class="generate-btn" onclick="generateRandomCode()">随机生成</button>
+                </div>
+                <div class="input-hint">只能包含字母、数字和下划线</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="expiry_date">过期时间：</label>
+                <input type="text" id="expiry_date" name="expiry_date" placeholder="选择过期时间" readonly>
+                <div class="input-hint">选择链接的过期时间，留空表示永久有效</div>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit">生成短链接</button>
+                {% if show_refresh %}
+                <form method="POST" action="{{ url_for('refresh') }}" style="display: inline;">
+                    <button type="submit" class="refresh-btn">刷新</button>
+                </form>
+                {% endif %}
+            </div>
+        </form>
+        
+        {% if short_url %}
+        <div class="result show">
+            <h3>生成的短链接：</h3>
+            <div class="short-url-container">
+                <a href="{{ short_url }}" target="_blank" class="short-url">{{ short_url }}</a>
+                <button class="copy-btn" onclick="copyToClipboard('{{ short_url }}')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    复制
+                </button>
+                <button class="qr-btn" onclick="showQRCode('{{ short_url }}')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    二维码
+                </button>
+            </div>
+            {% if expires_at %}
+            <div class="expiry-info">过期时间：{{ formatted_expires_at }}</div>
+            {% else %}
+            <div class="expiry-info">此链接永久有效</div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 二维码弹窗 -->
+        <div id="qrModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeQRModal()">&times;</span>
+                <h2>短链接二维码</h2>
+                <div id="qrcode" class="qrcode-container"></div>
+                <div class="qrcode-tip">扫描二维码即可访问链接</div>
+                <button class="download-btn" onclick="downloadQRCode()">下载二维码</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Flatpickr 日期选择器
+        flatpickr("#expiry_date", {
+            enableTime: true,
+            dateFormat: "Y/m/d H:i",
+            time_24hr: true,
+            locale: "zh",
+            allowInput: true,
+            clickOpens: true,
+            position: "auto",
+            disableMobile: false,
+            minuteIncrement: 1,
+            defaultHour: new Date().getHours(),
+            defaultMinute: new Date().getMinutes()
+        });
+
+        // 防止表单重复提交
+        document.getElementById('urlForm').addEventListener('submit', function(e) {
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = '生成中...';
+        });
+
+        // 点击页面任意位置关闭日期选择器
+        document.addEventListener('click', function(e) {
+            const dateInput = document.getElementById('expiry_date');
+            const calendar = document.querySelector('.flatpickr-calendar');
+            if (calendar && !calendar.contains(e.target) && !dateInput.contains(e.target)) {
+                dateInput._flatpickr.close();
+            }
+        });
+
+        function showDetailedUrlHint() {
+            document.getElementById('simple-hint').style.display = 'none';
+            document.getElementById('detailed-hint').style.display = 'block';
+            this.setCustomValidity('请输入有效的URL地址，必须包含http://或https://');
+        }
+        
+        function hideDetailedUrlHint() {
+            document.getElementById('simple-hint').style.display = 'block';
+            document.getElementById('detailed-hint').style.display = 'none';
+            this.setCustomValidity('');
+        }
+
+        function generateRandomCode() {
+            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 5; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            document.getElementById('custom_code').value = result;
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                const copyBtn = document.querySelector('.copy-btn');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                    已复制
+                `;
+                copyBtn.style.backgroundColor = '#34a853';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.style.backgroundColor = '#1a73e8';
+                }, 2000);
+            }).catch(function(err) {
+                alert('复制失败，请手动复制');
+            });
+        }
+
+        let qrcode = null;
+        function showQRCode(url) {
+            const modal = document.getElementById('qrModal');
+            const container = document.getElementById('qrcode');
+            container.innerHTML = '';  // 清除之前的二维码
+            
+            qrcode = new QRCode(container, {
+                text: url,
+                width: 256,
+                height: 256,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            modal.style.display = 'block';
+        }
+
+        function closeQRModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+
+        function downloadQRCode() {
+            const canvas = document.querySelector('#qrcode canvas');
+            const link = document.createElement('a');
+            link.download = 'qrcode.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('qrModal');
+            if (event.target == modal) {
+                closeQRModal();
+            }
+        }
+    </script>
+</body>
+</html> 

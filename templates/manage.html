@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curl Lite - 短链接管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #1a73e8;
+            margin: 0;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .back-btn {
+            color: #1a73e8;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.3s;
+        }
+        .back-btn:hover {
+            background-color: #e8f0fe;
+        }
+        .recycle-btn {
+            color: #34a853;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.3s;
+        }
+        .recycle-btn:hover {
+            background-color: #e6f4ea;
+        }
+        .links-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .links-table th, .links-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .links-table th {
+            background-color: #f8f9fa;
+            color: #5f6368;
+            font-weight: 500;
+        }
+        .links-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 8px;
+            transition: all 0.3s;
+        }
+        .edit-btn {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .edit-btn:hover {
+            background-color: #1557b0;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 100px auto;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #5f6368;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #5f6368;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus {
+            border-color: #1a73e8;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+        .modal-footer {
+            margin-top: 20px;
+            text-align: right;
+        }
+        .save-btn {
+            background-color: #1a73e8;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .save-btn:hover {
+            background-color: #1557b0;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-active {
+            background-color: #e6f4ea;
+            color: #137333;
+        }
+        .status-expired {
+            background-color: #fce8e6;
+            color: #c5221f;
+        }
+        .note-text {
+            color: #5f6368;
+            font-size: 14px;
+        }
+        .note-btn {
+            padding: 4px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #5f6368;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+        .note-btn:hover {
+            opacity: 1;
+        }
+        td {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* 新增的回收站区域样式 */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: #f8f9fa;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            font-size: 16px;
+            font-weight: 500;
+            color: #5f6368;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            background-color: #fff;
+            color: #1a73e8;
+            border-bottom: 3px solid #1a73e8;
+        }
+        .tab:hover:not(.active) {
+            background-color: #eee;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #5f6368;
+            font-size: 16px;
+        }
+        .delete-type {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .delete-type-expired {
+            background-color: #fce8e6;
+            color: #c5221f;
+        }
+        .delete-type-manual {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+        .refresh-btn {
+            background-color: #1a73e8;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .refresh-btn:hover {
+            background-color: #1557b0;
+        }
+        .refresh-btn svg {
+            animation: none;
+        }
+        .refresh-btn.refreshing svg {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>短链接管理</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="back-btn">返回首页</a>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('links')">短链接列表</button>
+            <button class="tab" onclick="showTab('recycle')">回收站</button>
+        </div>
+
+        <div id="links-tab" class="tab-content active">
+            <table class="links-table">
+                <thead>
+                    <tr>
+                        <th>短链接</th>
+                        <th>原始链接</th>
+                        <th>备注</th>
+                        <th>创建时间</th>
+                        <th>过期时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for link in links %}
+                    <tr data-id="{{ link.short_code }}">
+                        <td><a href="{{ request.host_url }}{{ link.short_code }}" target="_blank">{{ request.host_url }}{{ link.short_code }}</a></td>
+                        <td>{{ link.original_url }}</td>
+                        <td>
+                            <span class="note-text">{{ link.note or '' }}</span>
+                            <button class="note-btn" onclick="editNote('{{ link.short_code }}', '{{ link.note or '' }}')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                        </td>
+                        <td>{{ link.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ link.expires_at.strftime('%Y-%m-%d %H:%M') if link.expires_at else '永久有效' }}</td>
+                        <td>
+                            {% if not link.expires_at %}
+                                <span class="status status-active">有效</span>
+                            {% elif link.expires_at > now %}
+                                <span class="status status-active">有效</span>
+                            {% else %}
+                                <span class="status status-expired">已过期</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="action-btn edit-btn" onclick="editLink('{{ link.short_code }}')">编辑</button>
+                            <button class="action-btn delete-btn" onclick="deleteLink('{{ link.short_code }}')">删除</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="recycle-tab" class="tab-content">
+            {% if deleted_links %}
+            <div class="header-actions" style="justify-content: flex-end; margin-bottom: 10px;">
+                <button onclick="refreshRecycleBin()" class="refresh-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-2.76 1.69-5.12 4.08-6.11C7.47 5.32 9.17 5 11 5c4.97 0 9 4.03 9 9M22 12c0 2.76-1.69 5.12-4.08 6.11C16.53 18.68 14.83 19 13 19c-4.97 0-9-4.03-9-9"/>
+                    </svg>
+                    刷新
+                </button>
+                <button onclick="clearRecycleBin()" class="clear-btn">清空回收站</button>
+            </div>
+            <table class="links-table">
+                <thead>
+                    <tr>
+                        <th>短链接</th>
+                        <th>原始链接</th>
+                        <th>备注</th>
+                        <th>创建时间</th>
+                        <th>过期时间</th>
+                        <th>删除时间</th>
+                        <th>删除原因</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for link in deleted_links %}
+                    <tr>
+                        <td>{{ request.host_url }}{{ link.short_code }}</td>
+                        <td>{{ link.original_url }}</td>
+                        <td><span class="note-text">{{ link.note or '' }}</span></td>
+                        <td>{{ link.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ link.expired_at.strftime('%Y-%m-%d %H:%M') if link.expired_at else '永久有效' }}</td>
+                        <td>{{ link.deleted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            {% if link.delete_type == 'expired' %}
+                                <span class="delete-type delete-type-expired">过期删除</span>
+                            {% else %}
+                                <span class="delete-type delete-type-manual">手动删除</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-message">
+                回收站是空的
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 编辑弹窗 -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>编辑短链接</h2>
+                <form id="editForm">
+                    <div class="form-group">
+                        <label for="original_url">原始链接：</label>
+                        <input type="url" id="original_url" name="original_url" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expires_at">过期时间：</label>
+                        <input type="text" id="expires_at" name="expires_at" placeholder="选择过期时间（可选）">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="save-btn">保存更改</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 编辑备注弹窗 -->
+        <div id="noteModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeNoteModal()">&times;</span>
+                <h2>编辑备注</h2>
+                <form id="noteForm">
+                    <div class="form-group">
+                        <label for="note">备注内容：</label>
+                        <input type="text" id="note" name="note" maxlength="200" placeholder="请输入备注（最多200字）">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="save-btn">保存备注</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            // 初始化日期选择器
+            flatpickr("#expires_at", {
+                enableTime: true,
+                dateFormat: "Y/m/d H:i",
+                time_24hr: true,
+                locale: "zh",
+                allowInput: true
+            });
+
+            let currentEditingCode = null;
+            let currentEditingNote = null;
+
+            function editLink(shortCode) {
+                currentEditingCode = shortCode;
+                const row = document.querySelector(`tr[data-id="${shortCode}"]`);
+                const originalUrl = row.cells[1].textContent;
+                const expiresAt = row.cells[3].textContent;
+
+                document.getElementById('original_url').value = originalUrl;
+                document.getElementById('expires_at').value = expiresAt !== '永久有效' ? expiresAt : '';
+
+                document.getElementById('editModal').style.display = 'block';
+            }
+
+            function closeModal() {
+                document.getElementById('editModal').style.display = 'none';
+                currentEditingCode = null;
+            }
+
+            function deleteLink(shortCode) {
+                if (!confirm('确定要删除这个短链接吗？')) {
+                    return;
+                }
+
+                fetch(`/api/link/delete/${shortCode}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const row = document.querySelector(`tr[data-id="${shortCode}"]`);
+                        row.remove();
+                    } else {
+                        alert(data.message || '删除失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('删除失败，请稍后重试');
+                });
+            }
+
+            function editNote(shortCode, currentNote) {
+                currentEditingNote = shortCode;
+                document.getElementById('note').value = currentNote;
+                document.getElementById('noteModal').style.display = 'block';
+            }
+
+            function closeNoteModal() {
+                document.getElementById('noteModal').style.display = 'none';
+                currentEditingNote = null;
+            }
+
+            document.getElementById('editForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const data = {
+                    original_url: document.getElementById('original_url').value,
+                    expires_at: document.getElementById('expires_at').value
+                };
+
+                fetch(`/api/link/update/${currentEditingCode}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message || '更新失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('更新失败，请稍后重试');
+                });
+            });
+
+            document.getElementById('noteForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const data = {
+                    note: document.getElementById('note').value
+                };
+
+                fetch(`/api/link/note/${currentEditingNote}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message || '更新失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('更新失败，请稍后重试');
+                });
+            });
+
+            // 显示切换标签页
+            function showTab(tabName) {
+                // 隐藏所有标签页内容
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // 取消所有标签的激活状态
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // 激活选中的标签页
+                if (tabName === 'links') {
+                    document.getElementById('links-tab').classList.add('active');
+                    document.querySelector('.tab:nth-child(1)').classList.add('active');
+                } else {
+                    document.getElementById('recycle-tab').classList.add('active');
+                    document.querySelector('.tab:nth-child(2)').classList.add('active');
+                }
+            }
+
+            // 清空回收站
+            function clearRecycleBin() {
+                if (!confirm('确定要清空回收站吗？此操作不可恢复！')) {
+                    return;
+                }
+
+                fetch('/api/recycle-bin/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message || '清空失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('清空失败，请稍后重试');
+                });
+            }
+
+            // 刷新回收站
+            function refreshRecycleBin() {
+                const refreshBtn = document.querySelector('.refresh-btn');
+                refreshBtn.classList.add('refreshing');
+                
+                // 获取当前页面URL
+                const currentUrl = window.location.href;
+                
+                // 发起请求获取新数据
+                fetch(currentUrl)
+                    .then(response => response.text())
+                    .then(html => {
+                        // 创建一个临时的DOM元素来解析返回的HTML
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        // 获取新的回收站内容
+                        const newRecycleBin = doc.getElementById('recycle-tab');
+                        const currentRecycleBin = document.getElementById('recycle-tab');
+                        
+                        // 更新回收站内容
+                        if (newRecycleBin && currentRecycleBin) {
+                            currentRecycleBin.innerHTML = newRecycleBin.innerHTML;
+                        }
+                        
+                        // 移除刷新动画
+                        refreshBtn.classList.remove('refreshing');
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('刷新失败，请稍后重试');
+                        refreshBtn.classList.remove('refreshing');
+                    });
+            }
+
+            // 点击模态框外部关闭
+            window.onclick = function(event) {
+                const modal = document.getElementById('editModal');
+                if (event.target == modal) {
+                    closeModal();
+                }
+            }
+        </script>
+    </div>
+</body>
+</html> 
