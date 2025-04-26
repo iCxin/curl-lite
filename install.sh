@@ -9,9 +9,6 @@ NC='\033[0m'
 
 # 版本信息
 VERSION="1.0.0"
-MIN_PYTHON_VERSION="3.8.0"
-MIN_MYSQL_VERSION="8.0.0"
-MIN_REDIS_VERSION="6.0.0"
 
 # 打印带颜色的信息
 print_info() {
@@ -28,110 +25,6 @@ print_error() {
 
 print_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
-}
-
-# 检查命令是否存在
-check_command() {
-    local cmd=$1
-    local custom_path=""
-    
-    case $cmd in
-        "mysql")
-            # 1Panel 中 MySQL 可能的位置
-            if [ -f "/www/server/mysql/bin/mysql" ]; then
-                custom_path="/www/server/mysql/bin/mysql"
-            elif [ -f "/usr/local/mysql/bin/mysql" ]; then
-                custom_path="/usr/local/mysql/bin/mysql"
-            fi
-            ;;
-    esac
-    
-    if [ ! -z "$custom_path" ]; then
-        print_info "找到 $cmd 在: $custom_path"
-        return 0
-    elif command -v $cmd &> /dev/null; then
-        return 0
-    else
-        print_error "$cmd 未安装，请先安装 $cmd"
-        exit 1
-    fi
-}
-
-# 检查Python版本
-check_python_version() {
-    local python_version=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
-    if ! printf '%s\n%s\n' "$MIN_PYTHON_VERSION" "$python_version" | sort -V -C; then
-        print_error "Python版本过低，需要 $MIN_PYTHON_VERSION 或更高版本"
-        exit 1
-    fi
-}
-
-# 检查MySQL版本
-check_mysql_version() {
-    local mysql_cmd="mysql"
-    
-    # 检查 1Panel MySQL 路径
-    if [ -f "/www/server/mysql/bin/mysql" ]; then
-        mysql_cmd="/www/server/mysql/bin/mysql"
-    elif [ -f "/usr/local/mysql/bin/mysql" ]; then
-        mysql_cmd="/usr/local/mysql/bin/mysql"
-    fi
-    
-    local mysql_version=$($mysql_cmd --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-    if ! printf '%s\n%s\n' "$MIN_MYSQL_VERSION" "$mysql_version" | sort -V -C; then
-        print_error "MySQL版本过低，需要 $MIN_MYSQL_VERSION 或更高版本"
-        exit 1
-    fi
-}
-
-# 检查Redis版本
-check_redis_version() {
-    local redis_version=$(redis-cli --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-    if ! printf '%s\n%s\n' "$MIN_REDIS_VERSION" "$redis_version" | sort -V -C; then
-        print_error "Redis版本过低，需要 $MIN_REDIS_VERSION 或更高版本"
-        exit 1
-    fi
-}
-
-# 检查系统依赖
-check_dependencies() {
-    print_step "检查系统依赖..."
-    
-    local deps=("python3" "mysql" "redis-cli" "nginx" "git" "certbot")
-    for dep in "${deps[@]}"; do
-        check_command $dep
-    done
-    
-    check_python_version
-    check_mysql_version
-    check_redis_version
-}
-
-# 检查端口占用
-check_ports() {
-    print_step "检查端口占用..."
-    
-    local ports=(80 443 8000)
-    for port in "${ports[@]}"; do
-        if netstat -tuln | grep -q ":$port "; then
-            print_warn "端口 $port 已被占用，请确保该端口可用"
-            read -p "是否继续安装？[y/N] " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
-        fi
-    done
-}
-
-# 备份现有安装
-backup_existing() {
-    if [ -d "$INSTALL_DIR" ]; then
-        print_step "备份现有安装..."
-        local backup_dir="${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-        mv "$INSTALL_DIR" "$backup_dir"
-        print_info "已备份到: $backup_dir"
-    fi
 }
 
 # 主安装流程
@@ -156,12 +49,6 @@ EOF
         exit 1
     fi
     
-    # 检查依赖
-    check_dependencies
-    
-    # 检查端口
-    check_ports
-    
     # 配置信息
     print_step "收集配置信息..."
     read -p "请输入域名: " DOMAIN
@@ -170,11 +57,27 @@ EOF
         read -p "请重新输入域名: " DOMAIN
     done
     
+    # 数据库配置
+    print_step "配置远程数据库连接..."
+    read -p "请输入MySQL主机地址: " MYSQL_HOST
+    read -p "请输入MySQL端口 (默认3306): " MYSQL_PORT
+    MYSQL_PORT=${MYSQL_PORT:-3306}
     read -p "请输入MySQL用户名: " MYSQL_USER
     read -s -p "请输入MySQL密码: " MYSQL_PASS
     echo
+    read -p "请输入数据库名 (默认curl_lite): " MYSQL_DB
+    MYSQL_DB=${MYSQL_DB:-curl_lite}
+    
+    # Redis配置
+    print_step "配置远程Redis连接..."
+    read -p "请输入Redis主机地址: " REDIS_HOST
+    read -p "请输入Redis端口 (默认6379): " REDIS_PORT
+    REDIS_PORT=${REDIS_PORT:-6379}
     read -s -p "请输入Redis密码: " REDIS_PASS
     echo
+    read -p "请输入Redis数据库编号 (默认0): " REDIS_DB
+    REDIS_DB=${REDIS_DB:-0}
+    
     read -p "请输入管理员Token (留空将自动生成): " ADMIN_TOKEN
     read -p "请输入普通用户Token (留空将自动生成): " USER_TOKEN
     
@@ -195,7 +98,11 @@ EOF
     # 创建安装目录
     INSTALL_DIR="/www/wwwroot/curl_lite"
     print_step "准备安装目录..."
-    backup_existing
+    if [ -d "$INSTALL_DIR" ]; then
+        local backup_dir="${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+        mv "$INSTALL_DIR" "$backup_dir"
+        print_info "已备份到: $backup_dir"
+    fi
     mkdir -p $INSTALL_DIR
     
     # 克隆代码
@@ -206,13 +113,6 @@ EOF
     fi
     cd $INSTALL_DIR
     
-    # 安装依赖
-    print_step "安装Python依赖..."
-    if ! pip3 install -r requirements.txt; then
-        print_error "安装依赖失败"
-        exit 1
-    fi
-
     # 更新配置文件
     print_step "更新配置文件..."
     cat > config.py << EOL
@@ -223,11 +123,11 @@ from datetime import datetime, timedelta
 SECRET_KEY = '${SECRET_KEY}'
 
 # 数据库配置
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://${MYSQL_USER}:${MYSQL_PASS}@localhost/curl_lite'
+SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Redis配置
-REDIS_URL = 'redis://:${REDIS_PASS}@localhost:6379/0'
+REDIS_URL = 'redis://:${REDIS_PASS}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}'
 
 # Token配置
 VALID_TOKENS = {
@@ -304,7 +204,7 @@ EOL
     cat > /etc/systemd/system/curl_lite.service << EOL
 [Unit]
 Description=Curl Lite URL Shortener
-After=network.target mysql.service redis.service
+After=network.target
 
 [Service]
 User=www
@@ -323,20 +223,6 @@ EOL
     print_step "设置文件权限..."
     chown -R www:www $INSTALL_DIR
     chmod -R 755 $INSTALL_DIR
-    
-    # 创建数据库
-    print_step "创建数据库..."
-    local mysql_cmd="mysql"
-    if [ -f "/www/server/mysql/bin/mysql" ]; then
-        mysql_cmd="/www/server/mysql/bin/mysql"
-    elif [ -f "/usr/local/mysql/bin/mysql" ]; then
-        mysql_cmd="/usr/local/mysql/bin/mysql"
-    fi
-    
-    if ! $mysql_cmd -u${MYSQL_USER} -p${MYSQL_PASS} -e "CREATE DATABASE IF NOT EXISTS curl_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
-        print_error "创建数据库失败"
-        exit 1
-    fi
 
     # 启动服务
     print_step "启动服务..."
